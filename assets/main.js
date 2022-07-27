@@ -14,6 +14,7 @@ const betterJapanese = {
         replaceBuildings: true,
         replaceCSS: true,
         replaceNews: true,
+        replaceOthers: true,
         showSpoilerAlert: true,
         beautifyAscendNumber: true,
         numberJP: true,
@@ -235,6 +236,17 @@ const betterJapanese = {
 
         // 設定の「日本語訳の改善」がOFFになっている場合はここから下は実行しない (ニュース欄やアップデート履歴が壊れる)
         if (!betterJapanese.config.replaceJP) return
+
+        if (!betterJapanese.origins.parseLoc) betterJapanese.origins.parseLoc = parseLoc
+        parseLoc = function(str, params) {
+            // 独自実装されている翻訳でコケないように修正
+            if (str.constructor === Object) return ''
+
+            // 翻訳対象の文章の末尾に%が付いている場合に消えてしまう問題を修正
+            let baseStr = betterJapanese.origins.parseLoc(str, params)
+            if (typeof str === 'string' && str.endsWith('%')) baseStr += '%'
+            return baseStr
+        }
         
         // 時間表記からカンマを取り除く
         if (betterJapanese.config.replaceTime) {
@@ -516,17 +528,6 @@ const betterJapanese = {
 
         // その他破壊的な翻訳
         if (betterJapanese.config.replaceOthers) {
-            if (!betterJapanese.origins.parseLoc) betterJapanese.origins.parseLoc = parseLoc
-            parseLoc = function(str, params) {
-                // 独自実装されている翻訳でコケないように修正
-                if (str.constructor === Object) return ''
-    
-                // 翻訳対象の文章の末尾に%が付いている場合に消えてしまう問題を修正
-                let baseStr = betterJapanese.origins.parseLoc(str, params)
-                if (typeof str === 'string' && str.endsWith('%')) baseStr += '%'
-                return baseStr
-            }
-            
             // ミニゲームでの砂糖使用時に表示する確認ツールチップを翻訳
             if (!betterJapanese.origins.refillLump) betterJapanese.origins.refillLump = Game.refillLump
             Function('Game.refillLump = ' + Game.refillLump.toString().replace('\'refill\'', 'loc(\'refill\')'))()
@@ -600,6 +601,7 @@ const betterJapanese = {
             betterJapanese.writeButton('toggleBeautifyAscendNumber', 'beautifyAscendNumber', 'ヘブンリーチップスの短縮表記', '画面右上および転生時のヘブンリーチップス入手数を短縮表記にし、改行しないようにします。', null, 'dummySettingJP')
             betterJapanese.writeButton('toggleReplaceCSSButton', 'replaceCSS', 'CSSの変更', 'フレーバーテキストの囲み文字をかぎ括弧に変更します。', null, 'dummySettingJP')
             betterJapanese.writeButton('toggleReplaceNewsButton', 'replaceNews', 'ニュース欄の改善', 'ニュース欄の挙動および翻訳を置き換えます。', null, 'dummySettingJP')
+            betterJapanese.writeButton('toggleReplaceOthersButton', 'replaceOthers', 'そのほか微小な改善', 'ツールチップなどの翻訳を置き換えます。', null, 'dummySettingJP')
         }
 
         this.writeButton('toggleBJPButton', 'replaceJP', '日本語訳の改善', '公式の翻訳を非公式日本語訳に置き換えます。また、公式では翻訳されていない部分も翻訳されます。変更は再起動後に適用されます。')
