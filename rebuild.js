@@ -1,4 +1,4 @@
-function rebuildLocalization() {
+async function rebuildLocalization() {
     const funcInitString = Game.Init.toString().replaceAll(/[\r\n\t]/g, '')
     const GetTooltipFunc = (text, position) => {
         let str = position ? Game.getTooltip(text, position) : Game.getTooltip(text)
@@ -77,21 +77,7 @@ function rebuildLocalization() {
     }
     
     // ドラゴンオーラ名、概要
-    let dragonAuraDescsEN = []
-    for (let obj of funcInitString.match(/Game\.dragonAuras=\{.+?\};/)[0].matchAll(/desc:loc\((.+?)\)/g)) {
-        let res = null
-        if (obj[1][0] == '"' && obj[1][obj[1].length - 1] == '"') {
-            dragonAuraDescsEN.push(loc(obj[1].substring(1, obj[1].length - 1)))
-        } else if ((res = obj[1].match(/"(.+?)",(\d+?)/)) != null) {
-            dragonAuraDescsEN.push(loc(res[1], Number(res[2])))
-        } else if ((res = obj[1].match(/"(.+?)",\[(\d+?),(\d+?)]/)) != null) {
-            dragonAuraDescsEN.push(loc(res[1], [Number(res[2]), Number(res[3])]))
-        }
-    }
-    for (let dl in Game.dragonAuras) {
-        Game.dragonAuras[dl].dname = loc(Game.dragonAuras[dl].name)
-        Game.dragonAuras[dl].desc = loc(dragonAuraDescsEN[dl])
-    }
+    Function(funcInitString.match(/Game\.dragonAuras=\{.+?\};/)[0].replace(/name:'(.*?)',/g, 'name:\'$1\',dname:loc(\'$1\'),'))()
     
     // ドラゴンレベル概要
     let dragonLevelNamesEN = []
@@ -330,121 +316,143 @@ function rebuildLocalization() {
     }
 
     // ミニゲーム菜園関連の再翻訳
-    let Mg = Game.Objects['Farm'].minigame
-    const funcFarmInitString = Mg.init.toString().replace(/[\r\n\t]/g,　'')
-    // 作物の再翻訳
-    let plantsString = funcFarmInitString.match(/M\.plants=\{(.+?)\};/)[1]
-    for (let res of plantsString.matchAll(/'([^']+?)':\{name:'(.+?)(?<!\\)',.+?,effsStr:(.+?),q:/g)) {
-        let plant = Mg.plants[res[1]]
-        plant.name = loc(res[2].replaceAll('\\\'', '\''))
-        plant.effsStr = Function('return ' + res[3])()
-    }
-    // 土の再翻訳
-    let soilsString = funcFarmInitString.match(/M\.soils=\{(.+?)\};/)[1]
-    for (let res of soilsString.matchAll(/'([^']+?)':\{name:loc\("(.+?)(?<!\\)"\),.+?,effsStr:(.+?),q:/g)) {
-        let soil = Mg.soils[res[1]]
-        soil.name = loc(res[2])
-        soil.effsStr = Function('return ' + res[3])()
-    }
-    // ツールの再翻訳
-    for (let res of funcFarmInitString.substring(funcFarmInitString.indexOf('M.tools=')).matchAll(/'([^']+?)':\{name:loc\("(.+?)"\),.+?,(?:desc:(.+?),)?(?:descFunc|func):/g)) {
-        let tool = Mg.tools[res[1]]
-        tool.name = loc(res[2])
-        if (res[3]) {
-            tool.desc = Function('return ' + res[3])()
+    if (betterJapanese.isAvailableMinigame('Farm')) {
+        while (!Game.Objects['Farm'].hasOwnProperty('minigame')) await new Promise(resolve => setTimeout(resolve, 1000))
+        let Mg = Game.Objects['Farm'].minigame
+        const funcFarmInitString = Mg.init.toString().replace(/[\r\n\t]/g, '')
+
+        // 作物の再翻訳
+        let plantsString = funcFarmInitString.match(/M\.plants=\{(.+?)\};/)[1]
+        for (let res of plantsString.matchAll(/'([^']+?)':\{name:'(.+?)(?<!\\)',.+?,effsStr:(.+?),q:/g)) {
+            let plant = Mg.plants[res[1]]
+            plant.name = loc(res[2].replaceAll('\\\'', '\''))
+            plant.effsStr = Function('return ' + res[3])()
+        }
+
+        // 土の再翻訳
+        let soilsString = funcFarmInitString.match(/M\.soils=\{(.+?)\};/)[1]
+        for (let res of soilsString.matchAll(/'([^']+?)':\{name:loc\("(.+?)(?<!\\)"\),.+?,effsStr:(.+?),q:/g)) {
+            let soil = Mg.soils[res[1]]
+            soil.name = loc(res[2])
+            soil.effsStr = Function('return ' + res[3])()
+        }
+
+        // ツールの再翻訳
+        for (let res of funcFarmInitString.substring(funcFarmInitString.indexOf('M.tools=')).matchAll(/'([^']+?)':\{name:loc\("(.+?)"\),.+?,(?:desc:(.+?),)?(?:descFunc|func):/g)) {
+            let tool = Mg.tools[res[1]]
+            tool.name = loc(res[2])
+            if (res[3]) {
+                tool.desc = Function('return ' + res[3])()
+            }
         }
     }
 
     // ミニゲーム神殿関連の再翻訳
-    Mg = Game.Objects['Temple'].minigame
-    // 精霊の再翻訳
-    for (let res of Mg.init.toString().replace(/[\r\n\t]/g, '').matchAll(/'([^']+?)':\{.+?,desc1:(.+?),desc2:(.+?),desc3:(.+?),(?:descAfter:(.+?),)?quote:/g)) {
-        let god = Mg.gods[res[1]]
-        god.name = loc(FindLocStringByPart(`GOD ${god.id + 1} NAME`))
-        god.quote = loc(FindLocStringByPart(`GOD ${god.id + 1} QUOTE`))
-        god.desc1 = Function('return ' + res[2])()
-        god.desc2 = Function('return ' + res[3])()
-        god.desc3 = Function('return ' + res[4])()
-        if (res[5]) {
-            god.descAfter = Function('return ' + res[5])()
+    if (betterJapanese.isAvailableMinigame('Temple')) {
+        while (!Game.Objects['Temple'].hasOwnProperty('minigame')) await new Promise(resolve => setTimeout(resolve, 1000))
+        Mg = Game.Objects['Temple'].minigame
+
+        // 精霊の再翻訳
+        for (let res of Mg.init.toString().replace(/[\r\n\t]/g, '').matchAll(/'([^']+?)':\{.+?,desc1:(.+?),desc2:(.+?),desc3:(.+?),(?:descAfter:(.+?),)?quote:/g)) {
+            let god = Mg.gods[res[1]]
+            god.name = loc(FindLocStringByPart(`GOD ${god.id + 1} NAME`))
+            god.quote = loc(FindLocStringByPart(`GOD ${god.id + 1} QUOTE`))
+            god.desc1 = Function('return ' + res[2])()
+            god.desc2 = Function('return ' + res[3])()
+            god.desc3 = Function('return ' + res[4])()
+            if (res[5]) {
+                god.descAfter = Function('return ' + res[5])()
+            }
         }
+
+        // メイン画面を再翻訳
+        l('templeSwaps').onmosueover = GetTooltipFunc(`<div style="padding:8px;width:350px;font-size:11px;text-align:center;">${loc('Each time you slot a spirit, you use up one worship swap.<div class="line"></div>If you have 2 swaps left, the next one will refill after %1.<br>If you have 1 swap left, the next one will refill after %2.<br>If you have 0 swaps left, you will get one after %3.<div class="line"></div>Unslotting a spirit costs no swaps.', [Game.sayTime(60 * 60 * 1 * Game.fps), Game.sayTime(60 * 60 * 4 * Game.fps), Game.sayTime(60 * 60 * 16 * Game.fps)])}</div>`)
     }
-    // メイン画面を再翻訳
-    l('templeSwaps').onmosueover = GetTooltipFunc(`<div style="padding:8px;width:350px;font-size:11px;text-align:center;">${loc('Each time you slot a spirit, you use up one worship swap.<div class="line"></div>If you have 2 swaps left, the next one will refill after %1.<br>If you have 1 swap left, the next one will refill after %2.<br>If you have 0 swaps left, you will get one after %3.<div class="line"></div>Unslotting a spirit costs no swaps.', [Game.sayTime(60 * 60 * 1 * Game.fps), Game.sayTime(60 * 60 * 4 * Game.fps), Game.sayTime(60 * 60 * 16 * Game.fps)])}</div>`)
 
     // ミニゲーム在庫市場関連の再翻訳
-    Mg = Game.Objects['Bank'].minigame
-    const funcBunkInitString = Mg.init.toString().replaceAll(/[\r\n\t]/g, '')
-    // オフィスの再翻訳
-    let counter = 0
-    for (let res of funcBunkInitString.match(/M\.offices=\[(.+?)\];/)[1].matchAll(/{name:loc\("(.+?)"\),.+?,desc:(.+?)},/g)) {
-        Mg.offices[counter].name = loc(res[1])
-        Mg.offices[counter].desc = Function('return ' + res[2])()
-        counter++
-    }
-    // ローンの再翻訳
-    counter = 0
-    for (let res of funcBunkInitString.match(/M\.loanTypes=\[(.+?)\];/)[1].matchAll(/\[loc\("(.+?)"\),.+?,loc\("(.+?)"\)\]/g)) {
-        Mg.loanTypes[counter][0] = loc(res[1])
-        Mg.loanTypes[counter][6] = loc(res[2])
-        counter++
-    }
-    // メイン画面を再翻訳
-    l('bankHeader').children[0].children[0].innerHTML = loc('Profits: %1. All prices are in $econds of your highest raw cookies per second.', '<span id="bankBalance">$0</span>') + ' <span id="bankNextTick"></span>'
-    l('bankBrokersBuy').innerHTML = loc('Hire')
-    for (let i = 1; i <= 3; i++) {
-        l('bankLoan' + i).innerHTML = loc('Loan #%1', i)
-    }
-    const buyStr = loc('Buy')
-    const sellStr = loc('Sell')
-    for (let i = 0; i < Mg.goodsById.length; i++) {
-        let good = Mg.goodsById[i]
-        good.name = loc(FindLocStringByPart(`STOCK ${i + 1} TYPE`))
-        good.symbol = loc(FindLocStringByPart(`STOCK ${i + 1} LOGO`))
-        good.company = loc(FindLocStringByPart(`STOCK ${i + 1} NAME`))
-        let goodDiv = l('bankGood-' + i)
-        let bankSymbols = goodDiv.children[0].querySelectorAll('.bankSymbol')
-        let str = bankSymbols[0].innerHTML
-        bankSymbols[0].innerHTML = `${good.symbol} ${str.substring(str.indexOf('<'))}`
-        str = bankSymbols[1].innerHTML
-        bankSymbols[1].innerHTML = `${loc('value:')} ${str.substring(str.indexOf('<'))}`
-        str = bankSymbols[2].innerHTML
-        bankSymbols[2].innerHTML = `${loc('stock:')} ${str.substring(str.indexOf('<'))}`
-        good.symbolNumL = l(`bankGood-${good.id}-sym`)
-        good.valL = l(`bankGood-${good.id}-val`)
-        good.stockL = l(`bankGood-${good.id}-stock`)
-        good.stockMaxL = l(`bankGood-${good.id}-stockMax`)
-        bankSymbols = goodDiv.children[1].querySelectorAll('.bankSymbol')
-        for (let j = 0; j <= 1; j++) {
-            bankSymbols[j].style['display'] = (buyStr.length > 4 || sellStr.length > 4) ? 'block' : ''
-            bankSymbols[j].style['padding'] = (buyStr.length > 4 || sellStr.length > 4) ? '0px' : ''
-            bankSymbols[j].style['width'] = (buyStr.length > 4 || sellStr.length > 4) ? '100%' : ''
+    if (betterJapanese.isAvailableMinigame('Bank')) {
+        while (!Game.Objects['Bank'].hasOwnProperty('minigame')) await new Promise(resolve => setTimeout(resolve, 1000))
+        Mg = Game.Objects['Bank'].minigame
+        const funcBunkInitString = Mg.init.toString().replaceAll(/[\r\n\t]/g, '')
+
+        // オフィスの再翻訳
+        let counter = 0
+        for (let res of funcBunkInitString.match(/M\.offices=\[(.+?)\];/)[1].matchAll(/{name:loc\("(.+?)"\),.+?,desc:(.+?)},/g)) {
+            Mg.offices[counter].name = loc(res[1])
+            Mg.offices[counter].desc = Function('return ' + res[2])()
+            counter++
         }
-        bankSymbols[0].innerHTML = buyStr
-        bankSymbols[1].innerHTML = sellStr
-        l(`bankGood-${i}_Max`).innerHTML = cap(loc('max'))
-        l(`bankGood-${i}_-All`).innerHTML = cap(loc('all'))
+
+        // ローンの再翻訳
+        counter = 0
+        for (let res of funcBunkInitString.match(/M\.loanTypes=\[(.+?)\];/)[1].matchAll(/\[loc\("(.+?)"\),.+?,loc\("(.+?)"\)\]/g)) {
+            Mg.loanTypes[counter][0] = loc(res[1])
+            Mg.loanTypes[counter][6] = loc(res[2])
+            counter++
+        }
+
+        // メイン画面を再翻訳
+        l('bankHeader').children[0].children[0].innerHTML = loc('Profits: %1. All prices are in $econds of your highest raw cookies per second.', '<span id="bankBalance">$0</span>') + ' <span id="bankNextTick"></span>'
+        l('bankBrokersBuy').innerHTML = loc('Hire')
+        for (let i = 1; i <= 3; i++) {
+            l('bankLoan' + i).innerHTML = loc('Loan #%1', i)
+        }
+        const buyStr = loc('Buy')
+        const sellStr = loc('Sell')
+        for (let i = 0; i < Mg.goodsById.length; i++) {
+            let good = Mg.goodsById[i]
+            good.name = loc(FindLocStringByPart(`STOCK ${i + 1} TYPE`))
+            good.symbol = loc(FindLocStringByPart(`STOCK ${i + 1} LOGO`))
+            good.company = loc(FindLocStringByPart(`STOCK ${i + 1} NAME`))
+            let goodDiv = l('bankGood-' + i)
+            let bankSymbols = goodDiv.children[0].querySelectorAll('.bankSymbol')
+            let str = bankSymbols[0].innerHTML
+            bankSymbols[0].innerHTML = `${good.symbol} ${str.substring(str.indexOf('<'))}`
+            str = bankSymbols[1].innerHTML
+            bankSymbols[1].innerHTML = `${loc('value:')} ${str.substring(str.indexOf('<'))}`
+            str = bankSymbols[2].innerHTML
+            bankSymbols[2].innerHTML = `${loc('stock:')} ${str.substring(str.indexOf('<'))}`
+            good.symbolNumL = l(`bankGood-${good.id}-sym`)
+            good.valL = l(`bankGood-${good.id}-val`)
+            good.stockL = l(`bankGood-${good.id}-stock`)
+            good.stockMaxL = l(`bankGood-${good.id}-stockMax`)
+            bankSymbols = goodDiv.children[1].querySelectorAll('.bankSymbol')
+            for (let j = 0; j <= 1; j++) {
+                bankSymbols[j].style['display'] = (buyStr.length > 4 || sellStr.length > 4) ? 'block' : ''
+                bankSymbols[j].style['padding'] = (buyStr.length > 4 || sellStr.length > 4) ? '0px' : ''
+                bankSymbols[j].style['width'] = (buyStr.length > 4 || sellStr.length > 4) ? '100%' : ''
+            }
+            bankSymbols[0].innerHTML = buyStr
+            bankSymbols[1].innerHTML = sellStr
+            l(`bankGood-${i}_Max`).innerHTML = cap(loc('max'))
+            l(`bankGood-${i}_-All`).innerHTML = cap(loc('all'))
+        }
+        l('bankGraphLines').innerHTML = loc('Line style')
+        l('bankGraphCols').innerHTML = loc('Color mode')
+        if (l('bankCheatSpeeda') != null) {
+            l('bankCheatSpeeda').innerHTML = loc('Toggle speed')
+        }
+        l('bankGraphBox').children[1].innerHTML = loc('DOUGH JONES INDEX')
     }
-    l('bankGraphLines').innerHTML = loc('Line style')
-    l('bankGraphCols').innerHTML = loc('Color mode')
-    if (l('bankCheatSpeeda') != null) {
-        l('bankCheatSpeeda').innerHTML = loc('Toggle speed')
-    }
-    l('bankGraphBox').children[1].innerHTML = loc('DOUGH JONES INDEX')
 
     // ミニゲーム魔導書関連の再翻訳
-    Mg = Game.Objects['Wizard tower'].minigame
-    // 魔法を再翻訳
-    for (let res of Mg.init.toString().replace(/[\r\n\t]/g, '').matchAll(/'((?:[^']|\\')+?)(?<!\\)':\{name:loc\("(.+?)"\),desc:(.+?),(?:failDesc:(.+?),)?icon:/g)) {
-        let spell = Mg.spells[res[1].replaceAll('\\\'', '\'')]
-        spell.name = loc(res[2])
-        spell.desc = Function('return ' + res[3])()
-        if (res[4]) {
-            spell.failDesc = Function('return ' + res[4])()
+    if (betterJapanese.isAvailableMinigame('Wizard tower')) {
+        while (!Game.Objects['Wizard tower'].hasOwnProperty('minigame')) await new Promise(resolve => setTimeout(resolve, 1000))
+        Mg = Game.Objects['Wizard tower'].minigame
+
+        // 魔法を再翻訳
+        for (let res of Mg.init.toString().replace(/[\r\n\t]/g, '').matchAll(/'((?:[^']|\\')+?)(?<!\\)':\{name:loc\("(.+?)"\),desc:(.+?),(?:failDesc:(.+?),)?icon:/g)) {
+            let spell = Mg.spells[res[1].replaceAll('\\\'', '\'')]
+            spell.name = loc(res[2])
+            spell.desc = Function('return ' + res[3])()
+            if (res[4]) {
+                spell.failDesc = Function('return ' + res[4])()
+            }
         }
+
+        // 魔法メーターのツールチップを再翻訳
+        l('grimoireBarText').nextElementSibling.onmouserover = GetTooltipFunc(`<div style="padding:8px;width:300px;font-size:11px;text-align:center;">${loc('This is your magic meter. Each spell costs magic to use.<div class="line"></div>Your maximum amount of magic varies depending on your amount of <b>Wizard towers</b>, and their level.<div class="line"></div>Magic refills over time. The lower your magic meter, the slower it refills.')}</div>`)
     }
-    // 魔法メーターのツールチップを再翻訳
-    l('grimoireBarText').nextElementSibling.onmouserover = GetTooltipFunc(`<div style="padding:8px;width:300px;font-size:11px;text-align:center;">${loc('This is your magic meter. Each spell costs magic to use.<div class="line"></div>Your maximum amount of magic varies depending on your amount of <b>Wizard towers</b>, and their level.<div class="line"></div>Magic refills over time. The lower your magic meter, the slower it refills.')}</div>`)
 
     Game.RebuildUpgrades()
     Game.BuildStore()
@@ -518,6 +526,9 @@ function rebuildLocalization() {
     'Cookie Clickerは主に広告によって支えられています。<br>このサイトをブロックしないよう考えていただくか<a href="https://www.patreon.com/dashnet" target="_blank">Patreon</a>を確認してください!'
 
     const getNumber = (str) => {
+        const isExp = str.match(/[+-]?\d+(?:\.\d+)?[eE][+-]?\d+/)
+        if (isExp) return isExp[0]
+
         let res = str.match(/(\d+)((?:,\d+)+)?(.\d+)?( \w+)?/)
         let newval
         if (res) {
