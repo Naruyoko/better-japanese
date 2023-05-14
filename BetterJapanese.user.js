@@ -1,7 +1,9 @@
 // ==UserScript==
 // @name BetterJapanese
-// @include /https?://orteil.dashnet.org/cookieclicker/
+// @version 1.1
+// @match *://orteil.dashnet.org/cookieclicker/*
 // @description CookieClickerの公式日本語訳などを全面的に改善するMod
+// @autor yukineko, NATTO
 // ==/UserScript==
 
 const loadBJP = () => {

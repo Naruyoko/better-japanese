@@ -46,6 +46,7 @@ const betterJapanese = {
     tmpCategoryList: {},
     currentIgnoreList: [],
     isRegisteredHook: false,
+    isLoadedConfig: false,
 
     init: function() {
         let versionPath = App ? `file:///${App.mods['BetterJapanese'].dir.replace(/\\/g, '/')}/version.json` : 'https://pages.yukineko.me/better-japanese/version.json'
@@ -171,57 +172,6 @@ const betterJapanese = {
         `
         document.head.appendChild(customStyle)
 
-        // 単位関係の初期化
-        for (let suf of ['頻波羅', '矜羯羅', '阿伽羅']) {
-            let len = betterJapanese.formats.suffixes.push(suf) - 1
-            for (let i = 0; i < len; i++) {
-                betterJapanese.formats.suffixes.push(betterJapanese.formats.suffixes[i] + suf)
-            }
-        }
-
-        betterJapanese.formats.suffixes = ['', ...betterJapanese.formats.suffixes]
-
-        // 塵劫記用の単位
-        betterJapanese.formats.short = [...betterJapanese.formats.prefix, '阿僧祇', '那由多', '不可思議', '無量大数']
-
-        // 設定によって日本語単位を使用するように変更、同時にカンマ区切りも場合によって変更
-        if (!betterJapanese.origins.beautify) betterJapanese.origins.beautify = Beautify
-        Beautify = function(val, floats) {
-            let negative = (val < 0)
-            let decimal = ''
-            let fixed = val.toFixed(floats)
-            if (floats > 0 && Math.abs(val) < 1000 && Math.floor(fixed) != fixed) decimal = '.' + (fixed.toString()).split('.')[1]
-            val = Math.floor(Math.abs(val))
-            if (floats > 0 && fixed == val + 1) val++
-            let format = Game.prefs.format ? 2 : betterJapanese.config.numberJP ? 3 : 1
-            let formatter = numberFormatters[format]
-            let output = (val.toString().indexOf('e+') != -1 && format == 2) ? val.toPrecision(3).toString() : formatter(val).toString()
-            if (Game.prefs.format || (betterJapanese.config.numberJP && betterJapanese.config.secondFormatJP)) {
-                output = output.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-            } else {
-                output = output.replace(/^(\d)(\d{3})/, '$1,$2')
-            }
-            if (output == '0') negative = false
-            return negative ? '-' + output : output + decimal
-        }
-
-        // 本家の挿入関数に追加
-        numberFormatters = [
-            formatEveryThirdPower(formatShort),
-            formatEveryThirdPower(formatLong),
-            rawFormatter,
-            betterJapanese.formatEveryFourthPower()
-        ]
-
-        // 指数表記の場合表示が崩れる現象を修正
-        if (!betterJapanese.origins.simpleBeautify) betterJapanese.origins.simpleBeautify = SimpleBeautify
-        SimpleBeautify = function(val) {
-            if (val.toString().indexOf('e+') >= 0) {
-                return val.toString().replace(/(?<=.)(\d{3})(?=\d)/g, '$1,')
-            }
-            return betterJapanese.origins.simpleBeautify(val)
-        }
-
         if (betterJapanese.config.beautifyAscendNumber) {
             if (!betterJapanese.origins.logic) betterJapanese.origins.logic = Game.Logic
             Game.Logic = Function(betterJapanese.origins.logic.toString().replace(/^(?:[^\{])+\{((?:.|[\r\n\t])+)\}/, '$1').replace('Game.ascendNumber.textContent=\'+\'+SimpleBeautify(ascendNowToGet);', 'Game.ascendNumber.textContent=\'+\'+Beautify(ascendNowToGet);'))
@@ -346,12 +296,14 @@ const betterJapanese = {
                         let options = logResult[i].split('|')
                         let str = options.pop()
                         let isAppItem = false
+                        let stylePosition = -1
                         if (options.length > 0) {
                             if (options.includes('app')) isAppItem = true
+                            if (options.includes('style')) stylePosition = options.indexOf('style') + 1
                         }
                         if ((App && isAppItem) || !isAppItem) {
                             str = str.replaceAll('[Update Log General Names]', choose(loc('[Update Log General Names]')))
-                            logPerUpdate += `<div class="listing">${str}</div>`
+                            logPerUpdate += `<div class="listing"${stylePosition >= 0 && stylePosition < options.length ? `style="${options[stylePosition]}"` : ''}>${str}</div>`
                         }
                     }
                     logUpdates = `${logPerUpdate}</div>${logUpdates}`
@@ -545,6 +497,62 @@ const betterJapanese = {
         Game.removeHook('create', betterJapanese.initAfterLoad)
     },
 
+    overrideBeautify: function() {
+        // configが読み込まれていない可能性があるのでloadしておく
+        betterJapanese.load()
+
+        // 単位関係の初期化
+        for (let suf of ['頻波羅', '矜羯羅', '阿伽羅']) {
+            let len = betterJapanese.formats.suffixes.push(suf) - 1
+            for (let i = 0; i < len; i++) {
+                betterJapanese.formats.suffixes.push(betterJapanese.formats.suffixes[i] + suf)
+            }
+        }
+
+        betterJapanese.formats.suffixes = ['', ...betterJapanese.formats.suffixes]
+
+        // 塵劫記用の単位
+        betterJapanese.formats.short = [...betterJapanese.formats.prefix, '阿僧祇', '那由多', '不可思議', '無量大数']
+
+        // 設定によって日本語単位を使用するように変更、同時にカンマ区切りも場合によって変更
+        if (!betterJapanese.origins.beautify) betterJapanese.origins.beautify = Beautify
+        Beautify = function(val, floats) {
+            let negative = (val < 0)
+            let decimal = ''
+            let fixed = val.toFixed(floats)
+            if (floats > 0 && Math.abs(val) < 1000 && Math.floor(fixed) != fixed) decimal = '.' + (fixed.toString()).split('.')[1]
+            val = Math.floor(Math.abs(val))
+            if (floats > 0 && fixed == val + 1) val++
+            let format = Game.prefs.format ? 2 : betterJapanese.config.numberJP ? 3 : 1
+            let formatter = numberFormatters[format]
+            let output = (val.toString().indexOf('e+') != -1 && format == 2) ? val.toPrecision(3).toString() : formatter(val).toString()
+            if (Game.prefs.format || (betterJapanese.config.numberJP && betterJapanese.config.secondFormatJP)) {
+                output = output.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+            } else {
+                output = output.replace(/^(\d)(\d{3})/, '$1,$2')
+            }
+            if (output == '0') negative = false
+            return negative ? '-' + output : output + decimal
+        }
+
+        // 本家の挿入関数に追加
+        numberFormatters = [
+            formatEveryThirdPower(formatShort),
+            formatEveryThirdPower(formatLong),
+            rawFormatter,
+            betterJapanese.formatEveryFourthPower()
+        ]
+
+        // 指数表記の場合表示が崩れる現象を修正
+        if (!betterJapanese.origins.simpleBeautify) betterJapanese.origins.simpleBeautify = SimpleBeautify
+        SimpleBeautify = function(val) {
+            if (val.toString().indexOf('e+') >= 0) {
+                return val.toString().replace(/(?<=.)(\d{3})(?=\d)/g, '$1,')
+            }
+            return betterJapanese.origins.simpleBeautify(val)
+        }
+    },
+
     register: function() {
         Game.registerMod(this.name, this)
         if (!Game.ready) {
@@ -558,8 +566,11 @@ const betterJapanese = {
     },
 
     load: function() {
+        if (this.isLoadedConfig) return
+
         let conf = localStorage.getItem('BJPConfig')
         if (conf) this.config = Object.assign(this.config, JSON.parse(conf))
+        this.isLoadedConfig = true
     },
 
     log: function(msg) {
@@ -614,6 +625,17 @@ const betterJapanese = {
     injectStats: function() {
         const strLegacyStarted = '<div class="listing"><b>' + loc('Legacy started:') + '</b>'
         l('menu').innerHTML = l('menu').innerHTML.replace(new RegExp(strLegacyStarted + ' (.+?), (.+?)</div>'), strLegacyStarted + ' $1、$2</div>')
+
+        // 統計欄のデバッグ用アップグレードの見出しを翻訳
+        if (!betterJapanese.origins.updateMenu) betterJapanese.origins.updateMenu = Game.UpdateMenu
+        Game.UpdateMenu = function() {
+            betterJapanese.origins.updateMenu()
+            if (Game.onMenu == 'stats') {
+                if (l('statsUpgrades').children[0].children[0].innerHTML == 'Debug') {
+                    l('statsUpgrades').children[0].children[0].innerHTML = loc('Debug')
+                }
+            }
+        }
 
         let target = l('statsGeneral')
         let div = document.createElement('div')
@@ -1141,4 +1163,7 @@ if (App) {
 }
 
 // 言語設定が日本語であれば登録
-if (localStorage.getItem('CookieClickerLang') === 'JA') betterJapanese.register()
+if (localStorage.getItem('CookieClickerLang') === 'JA') {
+    betterJapanese.register()
+    betterJapanese.overrideBeautify()
+}
