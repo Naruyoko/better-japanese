@@ -47,6 +47,7 @@ const betterJapanese = {
     currentIgnoreList: [],
     isRegisteredHook: false,
     isLoadedConfig: false,
+    isShowedUnitChangeNotify: false,
 
     init: function() {
         let versionPath = App ? `file:///${App.mods['BetterJapanese'].dir.replace(/\\/g, '/')}/version.json` : 'https://pages.yukineko.me/better-japanese/version.json'
@@ -61,7 +62,7 @@ const betterJapanese = {
 
         if (App) send({ id: 'init bridge' })
 
-        if (!this.isRegisteredHook) this.initAfterLoad()
+        this.initAfterLoad()
 
         // Web版で既にDOMが構築されていた場合はDOMを再構成するスクリプトを読み込む (一部の翻訳が適用されないため)
         if (!App && Game.ready) Game.LoadMod(`https://pages.yukineko.me/better-japanese/rebuild.js?nocache=${Date.now()}`)
@@ -492,9 +493,6 @@ const betterJapanese = {
             if (!betterJapanese.origins.reincarnate) betterJapanese.origins.reincarnate = Game.Reincarnate
             Function('Game.Reincarnate = ' + Game.Reincarnate.toString().replace(/(Game\.Notify\()'Reincarnated'(,loc\("Hello, cookies!"\),\[10,0\],4\);)/, '$1loc("Reincarnated")$2'))()
         }
-        
-        // hookを削除
-        Game.removeHook('create', betterJapanese.initAfterLoad)
     },
 
     overrideBeautify: function() {
@@ -553,14 +551,6 @@ const betterJapanese = {
         }
     },
 
-    register: function() {
-        Game.registerMod(this.name, this)
-        if (!Game.ready) {
-            Game.registerHook('create', betterJapanese.initAfterLoad)
-            this.isRegisteredHook = true
-        }
-    },
-
     save: function() {
         localStorage.setItem('BJPConfig', JSON.stringify(this.config))
     },
@@ -582,6 +572,11 @@ const betterJapanese = {
             BeautifyAll()
             Game.RefreshStore()
             Game.upgradesToRebuild = 1
+
+            if (!betterJapanese.isShowedUnitChangeNotify) {
+                Game.Notify('日本語訳改善Mod', '単位の変更を検知しました。<br>変更後の単位を全ての要素に適用するには、再読み込みをしてください<br><a onclick="betterJapanese.reload()">セーブデータを保存して再読み込み</a>')
+                betterJapanese.isShowedUnitChangeNotify = true
+            }
         }
 
         let openSettings = () => {
@@ -1164,6 +1159,6 @@ if (App) {
 
 // 言語設定が日本語であれば登録
 if (localStorage.getItem('CookieClickerLang') === 'JA') {
-    betterJapanese.register()
+    Game.registerMod(betterJapanese.name, betterJapanese)
     betterJapanese.overrideBeautify()
 }
